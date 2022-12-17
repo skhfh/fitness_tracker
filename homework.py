@@ -1,44 +1,45 @@
+from dataclasses import dataclass, field
+
+
+@dataclass
 class InfoMessage:
     """Информационное сообщение о тренировке."""
-    def __init__(self,
-                 training_type: str,
-                 duration: float,
-                 distance: float,
-                 speed: float,
-                 calories: float
-                 ) -> None:
-        self.training_type = training_type
-        self.duration = duration
-        self.distance = distance
-        self.speed = speed
-        self.calories = calories
+    training_type: str
+    duration: float
+    distance: float
+    speed: float
+    calories: float
+
+    MESSAGE_TEXT: str = field(init=False, default=(
+        'Тип тренировки: {training_type}; '
+        'Длительность: {duration:.3f} ч.; '
+        'Дистанция: {distance:.3f} км; '
+        'Ср. скорость: {speed:.3f} км/ч; '
+        'Потрачено ккал: {calories:.3f}.'
+    ))
 
     def get_message(self) -> str:
-        message_parameters: list = [self.training_type, self.duration,
-                                    self.distance, self.speed, self.calories]
-        message: str = ('Тип тренировки: {0}; Длительность: {1:.3f} ч.; '
-                        'Дистанция: {2:.3f} км; Ср. скорость: {3:.3f} км/ч; '
-                        'Потрачено ккал: {4:.3f}.'.format(*message_parameters))
+        message: str = self.MESSAGE_TEXT.format(
+            training_type=self.training_type,
+            duration=self.duration,
+            distance=self.distance,
+            speed=self.speed,
+            calories=self.calories
+        )
         return message
 
 
+@dataclass
 class Training:
     """Базовый класс тренировки."""
-    M_IN_KM: int = 1000
-    CM_IN_M: int = 100
-    MIN_IN_H: int = 60
-    KMH_IN_MSEC: float = 0.278
+    action: int
+    duration: float
+    weight: float
 
-    LEN_STEP: float = 0.65
+    M_IN_KM: int = field(init=False, default=1000)
+    MIN_IN_H: int = field(init=False, default=60)
 
-    def __init__(self,
-                 action: int,
-                 duration: float,
-                 weight: float
-                 ) -> None:
-        self.action = action
-        self.duration = duration
-        self.weight = weight
+    LEN_STEP: float = field(init=False, default=0.65)
 
     def get_distance(self) -> float:
         """Получить дистанцию в км."""
@@ -65,10 +66,11 @@ class Training:
         return message
 
 
+@dataclass
 class Running(Training):
     """Тренировка: бег."""
-    CALORIES_MEAN_SPEED_MULTIPLIER: int = 18
-    CALORIES_MEAN_SPEED_SHIFT: float = 1.79
+    CALORIES_MEAN_SPEED_MULTIPLIER: int = field(init=False, default=18)
+    CALORIES_MEAN_SPEED_SHIFT: float = field(init=False, default=1.79)
 
     def get_spent_calories(self) -> float:
         """Получить количество затраченных калорий при беге."""
@@ -81,19 +83,19 @@ class Running(Training):
         return calories
 
 
+@dataclass
 class SportsWalking(Training):
     """Тренировка: спортивная ходьба."""
-    CALORIES_WEIGHT_MULTIPLIER: float = 0.035
-    CALORIES_SPEED_HEIGHT_MULTIPLIER: float = 0.029
+    height: float
 
-    def __init__(self,
-                 action: int,
-                 duration: float,
-                 weight: float,
-                 height: float
-                 ) -> None:
-        super().__init__(action, duration, weight)
-        self.height = height / self.CM_IN_M
+    CM_IN_M: int = field(init=False, default=100)
+    KMH_IN_MSEC: float = field(init=False, default=0.278)
+
+    CALORIES_WEIGHT_MULTIPLIER: float = field(init=False, default=0.035)
+    CALORIES_SPEED_HEIGHT_MULTIPLIER: float = field(init=False, default=0.029)
+
+    def __post_init__(self):
+        self.height = self.height / self.CM_IN_M
 
     def get_spent_calories(self) -> float:
         """Получить количество затраченных калорий при ходьбе."""
@@ -107,22 +109,16 @@ class SportsWalking(Training):
         return calories
 
 
+@dataclass
 class Swimming(Training):
     """Тренировка: плавание."""
-    LEN_STEP: float = 1.38
-    CALORIES_MEAN_SPEED_SHIFT: float = 1.1
-    CALORIES_MEAN_SPEED_MULTIPLIER: int = 2
+    length_pool: float
+    count_pool: int
 
-    def __init__(self,
-                 action: int,
-                 duration: float,
-                 weight: float,
-                 length_pool: float,
-                 count_pool: int
-                 ) -> None:
-        super().__init__(action, duration, weight)
-        self.length_pool = length_pool
-        self.count_pool = count_pool
+    LEN_STEP: float = field(init=False, default=1.38)
+
+    CALORIES_MEAN_SPEED_SHIFT: float = field(init=False, default=1.1)
+    CALORIES_MEAN_SPEED_MULTIPLIER: int = field(init=False, default=2)
 
     def get_mean_speed(self) -> float:
         """Получить среднюю скорость движения при плавании."""
@@ -149,7 +145,12 @@ def read_package(workout_type: str, data: list) -> Training:
                             'RUN': Running,
                             'WLK': SportsWalking}
     if workout_type in training_types:
-        workout = training_types[workout_type](*data)
+        try:
+            workout = training_types[workout_type](*data)
+        except TypeError:
+            print(f'Переданы неверные параметры для тренировки {workout_type}')
+    else:
+        print(f'Тип тренировки: {workout_type} не предусмотрен программой.')
     return workout
 
 
@@ -168,7 +169,11 @@ if __name__ == '__main__':
 
     for workout_type, data in packages:
         training: Training = read_package(workout_type, data)
-        if training is None:
-            print(f'Переданы неверные данные: тип тренировки {workout_type}')
-        else:
+        try:
             main(training)
+        except AttributeError:
+            pass
+        except ZeroDivisionError:
+            print(f'Для тренировки {training.__class__.__name__} '
+                  f'переданы некорректные параметры: длительность или рост '
+                  f'(для типа плавание).')
