@@ -80,4 +80,4 @@ packages = [
 
 ---
 ## Автор проекта
-[Shamil Khamidullin](https://github.com/skhfh)
+[skhfh](https://github.com/skhfh)
